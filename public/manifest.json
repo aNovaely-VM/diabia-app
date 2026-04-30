@@ -1,13 +1,14 @@
 {
   "name": "DIABIA",
   "short_name": "DIABIA",
-  "description": "Estimation glucides par photo pour diabétiques",
+  "description": "Assistant intelligent pour diabétiques sous pompe à insuline",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
+  "orientation": "portrait",
+  "background_color": "#08090d",
   "theme_color": "#3b82f6",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
