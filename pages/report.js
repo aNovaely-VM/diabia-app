@@ -30,10 +30,9 @@ export default function Report() {
   useEffect(() => {
     const loadPdfJs = async () => {
       try {
-        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-        // Desactiver le worker pour eviter les problemes de bundling
-        // Le PDF sera parse dans le thread principal (un peu plus lent mais fonctionne partout)
-        pdfjs.GlobalWorkerOptions.workerSrc = '';
+        const pdfjs = await import('pdfjs-dist');
+        // Utiliser le worker depuis unpkg CDN (plus fiable que cdnjs pour les versions recentes)
+        pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.7.284/build/pdf.worker.min.mjs';
         setPdfjsLib(pdfjs);
       } catch (err) {
         console.error('[v0] Erreur chargement pdfjs:', err);
