@@ -1,26 +1,34 @@
-// DIABIA — API /analyze-report : PDF Medtronic base64 → extraction texte → analyse Gemini
+// pages/api/analyze-report.js — fix stack overflow PDF + modèle Gemini
 import { createLogger } from '../../lib/logger';
 import { callGemini, extractJSON } from '../../lib/gemini';
 
 const log = createLogger('API:analyze-report');
 export const config = { api: { bodyParser: { sizeLimit: '25mb' } } };
 
-// Extraction texte brut depuis PDF base64 sans dépendance externe
 function extractTextFromPDFBuffer(buffer) {
   const log = createLogger('PDFExtractor');
   log.debug('Extraction texte du PDF', { bufferSize: buffer.length });
-  
+
   try {
+    // IMPORTANT : convertir le buffer par chunks pour éviter le stack overflow
+    const CHUNK = 8192;
+    let str = '';
+    for (let i = 0; i < buffer.length; i += CHUNK) {
+      str += Buffer.from(buffer.slice(i, i + CHUNK)).toString('latin1');
+    }
+
+    log.debug('Buffer converti en string', { stringLength: str.length });
+
     let text = '';
-    const str = Buffer.from(buffer).toString('latin1');
-    
+
     // Extraire les blocs texte PDF (BT...ET)
     const btRegex = /BT([\s\S]*?)ET/g;
     let match;
+    let blockCount = 0;
     while ((match = btRegex.exec(str)) !== null) {
+      blockCount++;
       const block = match[1];
-      // Extraire les strings entre parenthèses ()
-      const strRegex = /\(([^)]*)\)/g;
+      const strRegex = /\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
       let sm;
       while ((sm = strRegex.exec(block)) !== null) {
         const decoded = sm[1]
@@ -29,20 +37,43 @@ function extractTextFromPDFBuffer(buffer) {
         text += decoded + ' ';
       }
     }
-    
-    // Fallback : chercher des strings lisibles directement
-    if (text.length < 200) {
-      log.warn('Extraction BT/ET insuffisante, tentative fallback regex');
-      const readable = str.match(/[\x20-\x7E]{4,}/g) || [];
-      text = readable
-        .filter(s => s.length > 3 && !/^[\x00-\x1F]*$/.test(s))
-        .join(' ');
+    log.debug('Blocs BT/ET extraits', { blockCount, textLength: text.length });
+
+    // Extraire aussi les chaînes entre crochets [(...)(...)...]
+    const arrayRegex = /\[((?:\([^)]*\)\s*)+)\]/g;
+    while ((match = arrayRegex.exec(str)) !== null) {
+      const inner = match[1];
+      const strRegex2 = /\(([^)]*)\)/g;
+      let sm2;
+      while ((sm2 = strRegex2.exec(inner)) !== null) {
+        text += sm2[1] + ' ';
+      }
     }
 
-    log.info('Texte extrait', { charCount: text.length, preview: text.substring(0, 150) });
+    // Fallback si trop peu de texte
+    if (text.trim().length < 200) {
+      log.warn('Extraction BT/ET insuffisante, fallback sur regex générique', { textLength: text.length });
+      const readable = [];
+      const regex = /[\x20-\x7E]{5,}/g;
+      let m;
+      while ((m = regex.exec(str)) !== null) {
+        readable.push(m[0]);
+      }
+      text = readable.filter(s => /[a-zA-Z]{2,}/.test(s)).join(' ');
+      log.debug('Fallback regex', { chunksFound: readable.length, textLength: text.length });
+    }
+
+    // Nettoyage
+    text = text.replace(/\s+/g, ' ').trim();
+    log.info('Texte extrait avec succès', {
+      charCount: text.length,
+      wordCount: text.split(/\s+/).length,
+      preview: text.substring(0, 200),
+    });
+
     return text;
   } catch (err) {
-    log.error('Erreur extraction PDF', err.message);
+    log.error('Erreur extraction PDF', { message: err.message, stack: err.stack });
     return '';
   }
 }
@@ -78,9 +109,9 @@ export default async function handler(req, res) {
       log.debug('Buffer PDF décodé', { sizeKB: Math.round(buffer.length / 1024) });
       textContent = extractTextFromPDFBuffer(buffer);
     } catch (err) {
-      log.error('Erreur décodage base64', err.message);
+      log.error('Erreur décodage base64', { message: err.message });
       log.groupEnd();
-      return res.status(400).json({ error: 'PDF invalide ou corrompu' });
+      return res.status(400).json({ error: 'PDF invalide ou corrompu : ' + err.message });
     }
   } else {
     log.error('Aucun contenu PDF fourni');
@@ -89,13 +120,13 @@ export default async function handler(req, res) {
   }
 
   if (textContent.trim().length < 100) {
-    log.warn('Texte extrait insuffisant, tentative avec prompt enrichi', { textLength: textContent.length });
+    log.warn('Texte extrait insuffisant', { textLength: textContent.length });
+    // On continue quand même — Gemini peut parfois inférer depuis peu de texte
   }
 
-  log.info('Texte extrait avec succès', { 
+  log.info('Texte prêt pour l\'analyse', {
     charCount: textContent.length,
     wordCount: textContent.split(/\s+/).length,
-    preview: textContent.substring(0, 200)
   });
 
   try {
@@ -107,7 +138,7 @@ Voici le contenu extrait d'un rapport Medtronic CareLink d'un patient diabétiqu
 ${textContent.substring(0, 7000)}
 ---
 
-Analyse ce rapport en profondeur. Réponds UNIQUEMENT en JSON valide, sans markdown :
+Analyse ce rapport en profondeur. Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte autour :
 {
   "period": "<période du rapport>",
   "summary": {
@@ -155,8 +186,7 @@ Analyse ce rapport en profondeur. Réponds UNIQUEMENT en JSON valide, sans markd
     log.info('Envoi du texte à Gemini pour analyse médicale', { textLength: textContent.length });
     const t0 = Date.now();
     const rawContent = await callGemini({ prompt, temperature: 0.1 });
-    const elapsed = Date.now() - t0;
-    log.info('Analyse Gemini terminée', { duration: `${elapsed}ms`, responseLength: rawContent.length });
+    log.info('Analyse Gemini terminée', { duration: `${Date.now() - t0}ms`, responseLength: rawContent.length });
 
     const result = extractJSON(rawContent);
 
