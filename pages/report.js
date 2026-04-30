@@ -31,8 +31,11 @@ export default function Report() {
     const loadPdfJs = async () => {
       try {
         const pdfjs = await import('pdfjs-dist');
-        // Configurer le worker
-        pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+        // Utiliser le worker inline pour eviter les problemes CORS/CDN
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.min.mjs',
+          import.meta.url
+        ).toString();
         setPdfjsLib(pdfjs);
       } catch (err) {
         console.error('[v0] Erreur chargement pdfjs:', err);
