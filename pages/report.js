@@ -30,12 +30,10 @@ export default function Report() {
   useEffect(() => {
     const loadPdfJs = async () => {
       try {
-        const pdfjs = await import('pdfjs-dist');
-        // Utiliser le worker inline pour eviter les problemes CORS/CDN
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          'pdfjs-dist/build/pdf.worker.min.mjs',
-          import.meta.url
-        ).toString();
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        // Desactiver le worker pour eviter les problemes de bundling
+        // Le PDF sera parse dans le thread principal (un peu plus lent mais fonctionne partout)
+        pdfjs.GlobalWorkerOptions.workerSrc = '';
         setPdfjsLib(pdfjs);
       } catch (err) {
         console.error('[v0] Erreur chargement pdfjs:', err);
