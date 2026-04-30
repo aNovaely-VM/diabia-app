@@ -1,260 +1,137 @@
-import { useState, useRef } from 'react';
-import Head from 'next/head';
+// DIABIA — Dashboard
+import Layout from '../components/Layout';
+import Link from 'next/link';
 
-const S = {
-  page: { minHeight: '100vh', minHeight: '100dvh', background: '#0a0a0f', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 0 40px' },
-  inner: { width: '100%', maxWidth: 480, padding: '0 16px' },
+const METRICS = [
+  { key: 'avg_glucose', label: 'Glycémie moy.', unit: 'mg/dL', good: (v) => v <= 154, warn: (v) => v <= 183 },
+  { key: 'gmi', label: 'GMI', unit: '%', good: (v) => v <= 7, warn: (v) => v <= 8 },
+  { key: 'time_in_range', label: 'Temps cible', unit: '%', good: (v) => v >= 70, warn: (v) => v >= 50 },
+  { key: 'sensor_wear', label: 'Port capteur', unit: '%', good: (v) => v >= 70, warn: (v) => v >= 50 },
+];
 
-  // Header
-  header: { display: 'flex', alignItems: 'center', gap: 12, padding: '20px 16px 24px', position: 'sticky', top: 0, background: 'rgba(10,10,15,0.92)', backdropFilter: 'blur(12px)', zIndex: 10, width: '100%', maxWidth: 480 },
-  logo: { width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 },
-  title: { fontSize: 22, fontWeight: 700, letterSpacing: '-0.5px', color: 'white' },
-  subtitle: { fontSize: 12, color: '#6b7280', marginTop: 1 },
+function MetricCard({ label, value, unit, good, warn }) {
+  const color = value == null ? '#4b5563' : good(value) ? '#22c55e' : warn(value) ? '#f59e0b' : '#ef4444';
+  return (
+    <div style={{ background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 14, padding: '16px 14px', flex: 1, minWidth: 0 }}>
+      <p style={{ color: '#6b7280', fontSize: 11, fontWeight: 500, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</p>
+      <p style={{ color: value == null ? '#374151' : color, fontSize: 22, fontWeight: 700, lineHeight: 1 }}>
+        {value ?? '—'}
+        <span style={{ fontSize: 12, fontWeight: 400, color: '#6b7280', marginLeft: 3 }}>{value != null ? unit : ''}</span>
+      </p>
+      <div style={{ marginTop: 8, height: 3, background: '#1a1f2e', borderRadius: 2 }}>
+        {value != null && <div style={{ height: '100%', borderRadius: 2, background: color, width: unit === '%' ? `${Math.min(value, 100)}%` : `${Math.min((value / 300) * 100, 100)}%`, transition: 'width 0.6s ease' }} />}
+      </div>
+    </div>
+  );
+}
 
-  // Upload
-  uploadZone: (hasImage) => ({
-    border: `2px dashed ${hasImage ? '#3b82f6' : '#374151'}`,
-    borderRadius: 20,
-    padding: hasImage ? 6 : 48,
-    textAlign: 'center',
-    cursor: 'pointer',
-    marginBottom: 12,
-    background: '#111827',
-    transition: 'border-color 0.2s',
-    minHeight: hasImage ? 'auto' : 200,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    WebkitTapHighlightColor: 'transparent',
-  }),
-  uploadImg: { width: '100%', borderRadius: 16, maxHeight: 300, objectFit: 'cover' },
-  uploadIcon: { fontSize: 56, marginBottom: 14 },
-  uploadText: { color: '#e5e7eb', fontWeight: 600, fontSize: 16, marginBottom: 6 },
-  uploadSub: { color: '#6b7280', fontSize: 13 },
-
-  // Bouton principal
-  btn: (disabled) => ({
-    width: '100%',
-    background: disabled ? '#1e3a5f' : 'linear-gradient(135deg, #3b82f6, #06b6d4)',
-    color: 'white',
-    border: 'none',
-    borderRadius: 16,
-    padding: '16px 0',
-    fontSize: 16,
-    fontWeight: 700,
-    marginBottom: 14,
-    opacity: disabled ? 0.7 : 1,
-    transition: 'opacity 0.2s',
-    WebkitTapHighlightColor: 'transparent',
-    letterSpacing: '0.3px',
-  }),
-
-  // Reset
-  btnReset: { width: '100%', background: '#1f2937', color: '#9ca3af', border: 'none', borderRadius: 14, padding: '13px 0', fontSize: 14, fontWeight: 600, marginTop: 8, WebkitTapHighlightColor: 'transparent' },
-
-  // Error
-  error: { background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 14, padding: '14px 16px', marginBottom: 14, color: '#fca5a5', fontSize: 14, lineHeight: 1.5 },
-
-  // Cards résultats
-  cardTotal: { background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 18, padding: '22px 16px', textAlign: 'center', marginBottom: 10 },
-  cardTotalLabel: { color: '#9ca3af', fontSize: 13, marginBottom: 8 },
-  cardTotalValue: { color: '#60a5fa', fontSize: 52, fontWeight: 800, lineHeight: 1, marginBottom: 4 },
-  cardTotalMargin: { color: '#6b7280', fontSize: 12 },
-
-  cardBolus: { background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 18, padding: '16px', marginBottom: 10 },
-  cardBolusTitle: { color: '#86efac', fontWeight: 700, fontSize: 13, marginBottom: 8 },
-  cardBolusValue: { color: 'white', fontSize: 30, fontWeight: 800, marginBottom: 4 },
-  cardBolusNote: { color: '#6b7280', fontSize: 12, lineHeight: 1.4 },
-
-  cardFoods: { background: '#111827', borderRadius: 18, padding: 16, marginBottom: 10 },
-  cardFoodsTitle: { color: '#9ca3af', fontSize: 13, fontWeight: 600, marginBottom: 10 },
-  foodItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f2937', borderRadius: 12, padding: '11px 14px', marginBottom: 7 },
-  foodName: { color: 'white', fontSize: 14, fontWeight: 500, marginBottom: 2 },
-  foodQty: { color: '#6b7280', fontSize: 12 },
-  foodCarbs: { color: '#93c5fd', fontWeight: 700, fontSize: 17 },
-
-  cardAdvice: { background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 18, padding: '16px', marginBottom: 10 },
-  cardAdviceTitle: { color: '#fbbf24', fontWeight: 700, fontSize: 13, marginBottom: 8 },
-  cardAdviceText: { color: '#d1d5db', fontSize: 14, lineHeight: 1.6 },
-
-  // Loading
-  loadingWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: 16 },
-  loadingSpinner: { width: 48, height: 48, border: '4px solid #1f2937', borderTop: '4px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
-  loadingText: { color: '#9ca3af', fontSize: 15 },
-};
-
-export default function Home() {
-  const [image, setImage] = useState(null);
-  const [imageUrl, setImageUrl] = useState(null);
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const fileRef = useRef();
-
-  const handleImage = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setImage(file);
-    setImageUrl(URL.createObjectURL(file));
-    setResult(null);
-    setError(null);
-  };
-
-  const analyze = async () => {
-    if (!image) return;
-    setLoading(true);
-    setError(null);
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      try {
-        const base64 = reader.result.split(',')[1];
-        const res = await fetch('/api/estimate-carbs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_base64: base64, mime_type: image.type }),
-        });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        setResult(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    reader.readAsDataURL(image);
-  };
-
-  const reset = () => {
-    setImage(null);
-    setImageUrl(null);
-    setResult(null);
-    setError(null);
-    if (fileRef.current) fileRef.current.value = '';
-  };
+export default function Dashboard() {
+  // En production : charger depuis localStorage ou API
+  const lastReport = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('diabia_last_report') || 'null') : null;
+  const s = lastReport?.summary;
 
   return (
-    <>
-      <Head>
-        <title>DIABIA — Estimation glucides</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="description" content="Prends en photo ton repas et obtiens une estimation précise des glucides" />
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-          @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-          .fade-in { animation: fadeIn 0.3s ease; }
-        `}</style>
-      </Head>
+    <Layout title="Tableau de bord">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      <div style={S.page}>
-        {/* Header sticky */}
-        <div style={S.header}>
-          <div style={S.logo}>🩺</div>
-          <div>
-            <div style={S.title}>DIABIA</div>
-            <div style={S.subtitle}>Estimation des glucides par IA</div>
+        {/* Welcome */}
+        <div style={{ paddingTop: 4 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.5px', marginBottom: 4 }}>Tableau de bord</h1>
+          <p style={{ color: '#64748b', fontSize: 14 }}>
+            {lastReport ? `Dernière analyse — ${lastReport.period}` : 'Aucune analyse disponible'}
+          </p>
+        </div>
+
+        {/* Status badge */}
+        {lastReport && (
+          <div style={{
+            background: lastReport.status === 'bon' ? 'rgba(34,197,94,0.08)' : lastReport.status === 'moyen' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)',
+            border: `1px solid ${lastReport.status === 'bon' ? 'rgba(34,197,94,0.2)' : lastReport.status === 'moyen' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}`,
+            borderRadius: 12, padding: '12px 14px',
+          }}>
+            <p style={{ color: lastReport.status === 'bon' ? '#4ade80' : lastReport.status === 'moyen' ? '#fbbf24' : '#f87171', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+              Contrôle glycémique — {lastReport.status?.toUpperCase()}
+            </p>
+            <p style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.5 }}>{lastReport.next_steps}</p>
+          </div>
+        )}
+
+        {/* Métriques */}
+        <div>
+          <p style={{ color: '#475569', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>Indicateurs clés</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {METRICS.map(m => (
+              <MetricCard key={m.key} label={m.label} value={s?.[m.key] ?? null} unit={m.unit} good={m.good} warn={m.warn} />
+            ))}
           </div>
         </div>
 
-        <div style={S.inner}>
-          {/* Zone upload — masquée si résultat */}
-          {!result && !loading && (
-            <>
-              <div style={S.uploadZone(!!imageUrl)} onClick={() => fileRef.current.click()}>
-                {imageUrl ? (
-                  <img src={imageUrl} alt="Repas" style={S.uploadImg} />
-                ) : (
-                  <>
-                    <div style={S.uploadIcon}>📸</div>
-                    <p style={S.uploadText}>Photo de ton repas</p>
-                    <p style={S.uploadSub}>Appuie pour ouvrir l'appareil photo</p>
-                  </>
-                )}
-                <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleImage} style={{ display: 'none' }} />
+        {/* Recommandations prioritaires */}
+        {lastReport?.recommendations?.filter(r => r.priority === 'haute').length > 0 && (
+          <div>
+            <p style={{ color: '#475569', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>Actions prioritaires</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {lastReport.recommendations.filter(r => r.priority === 'haute').slice(0, 3).map((rec, i) => (
+                <div key={i} style={{ background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 12, padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', flexShrink: 0, marginTop: 5 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>{rec.category}</p>
+                    <p style={{ color: '#e2e8f0', fontSize: 14, lineHeight: 1.5 }}>{rec.explanation}</p>
+                    {rec.suggested_value && (
+                      <p style={{ color: '#60a5fa', fontSize: 12, marginTop: 4 }}>Suggestion : {rec.suggested_value}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Actions rapides */}
+        <div>
+          <p style={{ color: '#475569', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>Actions rapides</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Link href="/carbs" style={{
+              background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 14,
+              padding: '16px', display: 'flex', alignItems: 'center', gap: 14,
+            }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="18" height="18" fill="none" stroke="#60a5fa" strokeWidth="1.75" viewBox="0 0 24 24">
+                  <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </div>
-
-              {imageUrl && (
-                <button onClick={analyze} style={S.btn(false)}>
-                  🔍 Analyser les glucides
-                </button>
-              )}
-
-              {!imageUrl && (
-                <button onClick={() => fileRef.current.click()} style={S.btn(false)}>
-                  📸 Prendre une photo
-                </button>
-              )}
-            </>
-          )}
-
-          {/* Loading */}
-          {loading && (
-            <div style={S.loadingWrap} className="fade-in">
-              {imageUrl && <img src={imageUrl} alt="Repas" style={{ ...S.uploadImg, marginBottom: 20, opacity: 0.6 }} />}
-              <div style={S.loadingSpinner} />
-              <p style={S.loadingText}>Gemini analyse ton repas…</p>
-            </div>
-          )}
-
-          {/* Erreur */}
-          {error && (
-            <div style={S.error} className="fade-in">
-              ⚠️ {error}
-              <button onClick={reset} style={{ ...S.btnReset, marginTop: 10 }}>Réessayer</button>
-            </div>
-          )}
-
-          {/* Résultats */}
-          {result && (
-            <div className="fade-in">
-              {imageUrl && <img src={imageUrl} alt="Repas" style={{ ...S.uploadImg, marginBottom: 12 }} />}
-
-              {/* Total glucides */}
-              <div style={S.cardTotal}>
-                <p style={S.cardTotalLabel}>Glucides estimés</p>
-                <p style={S.cardTotalValue}>{result.total_carbs}<span style={{ fontSize: 24, fontWeight: 600 }}>g</span></p>
-                <p style={S.cardTotalMargin}>± {result.margin}g d'incertitude</p>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: '#e2e8f0', fontSize: 15, fontWeight: 600, marginBottom: 2 }}>Estimer les glucides</p>
+                <p style={{ color: '#4b5563', fontSize: 13 }}>Prendre en photo un repas</p>
               </div>
-
-              {/* Bolus suggéré */}
-              {result.bolus_suggestion && (
-                <div style={S.cardBolus}>
-                  <p style={S.cardBolusTitle}>💉 Bolus repas suggéré</p>
-                  <p style={S.cardBolusValue}>{result.bolus_suggestion.dose} <span style={{ fontSize: 16, fontWeight: 400, color: '#86efac' }}>unités</span></p>
-                  <p style={S.cardBolusNote}>Basé sur un ratio de {result.bolus_suggestion.ratio} g/U — adapte à ton ratio personnel</p>
-                </div>
-              )}
-
-              {/* Détail aliments */}
-              {result.foods?.length > 0 && (
-                <div style={S.cardFoods}>
-                  <p style={S.cardFoodsTitle}>🍽️ Détail par aliment</p>
-                  {result.foods.map((food, i) => (
-                    <div key={i} style={{ ...S.foodItem, marginBottom: i < result.foods.length - 1 ? 7 : 0 }}>
-                      <div>
-                        <p style={S.foodName}>{food.name}</p>
-                        <p style={S.foodQty}>{food.quantity}</p>
-                      </div>
-                      <span style={S.foodCarbs}>{food.carbs}g</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Conseil DIABIA */}
-              {result.advice && (
-                <div style={S.cardAdvice}>
-                  <p style={S.cardAdviceTitle}>💡 Conseil DIABIA</p>
-                  <p style={S.cardAdviceText}>{result.advice}</p>
-                </div>
-              )}
-
-              <button onClick={reset} style={S.btnReset}>📸 Analyser un autre repas</button>
-            </div>
-          )}
+              <svg width="16" height="16" fill="none" stroke="#374151" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </Link>
+            <Link href="/report" style={{
+              background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 14,
+              padding: '16px', display: 'flex', alignItems: 'center', gap: 14,
+            }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="18" height="18" fill="none" stroke="#34d399" strokeWidth="1.75" viewBox="0 0 24 24">
+                  <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: '#e2e8f0', fontSize: 15, fontWeight: 600, marginBottom: 2 }}>Analyser un rapport</p>
+                <p style={{ color: '#4b5563', fontSize: 13 }}>Importer un PDF Medtronic</p>
+              </div>
+              <svg width="16" height="16" fill="none" stroke="#374151" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </Link>
+          </div>
         </div>
+
+        {!lastReport && (
+          <div style={{ background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 14, padding: 20, textAlign: 'center' }}>
+            <p style={{ color: '#374151', fontSize: 14, lineHeight: 1.6 }}>
+              Commencez par analyser votre rapport Medtronic pour voir vos indicateurs ici.
+            </p>
+          </div>
+        )}
       </div>
-    </>
+    </Layout>
   );
 }
