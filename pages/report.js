@@ -65,6 +65,23 @@ export default function Report() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pdf_base64: base64, filename }),
       });
+      
+      // Vérifier si la réponse est OK
+      if (!res.ok) {
+        const text = await res.text();
+        // Si le texte commence par un message d'erreur connu
+        if (text.includes('Request Entity Too Large') || text.includes('body exceeded')) {
+          throw new Error('Le fichier PDF est trop volumineux. Essayez avec un fichier plus petit.');
+        }
+        // Essayer de parser comme JSON sinon
+        try {
+          const errData = JSON.parse(text);
+          throw new Error(errData.error || 'Erreur serveur');
+        } catch {
+          throw new Error(`Erreur serveur (${res.status}): ${text.slice(0, 100)}`);
+        }
+      }
+      
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setResult(data);
