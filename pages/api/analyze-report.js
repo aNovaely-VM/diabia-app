@@ -4,7 +4,12 @@
 import { createLogger } from '../../lib/logger';
 
 const log = createLogger('API:analyze-report');
-export const config = { api: { bodyParser: { sizeLimit: '25mb' } } };
+export const config = { 
+  api: { 
+    bodyParser: { sizeLimit: '50mb' },
+    responseLimit: false,
+  } 
+};
 
 // ============================================================================
 // GUIDELINES MÉDICALES - ATTD 2022 / ADA 2024
