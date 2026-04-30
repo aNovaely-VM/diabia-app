@@ -1,4 +1,4 @@
-// DIABIA — Page analyse rapport Medtronic PDF
+// pages/report.js — fix lecture PDF côté client (chunk par chunk)
 import { useState, useRef } from 'react';
 import Layout from '../components/Layout';
 
@@ -16,9 +16,19 @@ function StatRow({ label, value, unit, good, warn }) {
   );
 }
 
+// Convertir ArrayBuffer en base64 sans stack overflow
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const CHUNK = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
 export default function Report() {
   const [file, setFile] = useState(null);
-  const [pdfText, setPdfText] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
@@ -32,15 +42,15 @@ export default function Report() {
     setFile(f);
     setResult(null);
     setError(null);
-
-    // Lecture du PDF côté client avec pdf.js (CDN)
-    setLoadingStep('Lecture du PDF…');
     setLoading(true);
+    setLoadingStep('Lecture du fichier…');
+
     try {
       const arrayBuffer = await f.arrayBuffer();
-      const uint8 = new Uint8Array(arrayBuffer);
-      // Extraction texte via API
-      const base64 = btoa(String.fromCharCode(...uint8.slice(0, Math.min(uint8.length, 500000))));
+      setLoadingStep('Encodage du PDF…');
+      // Conversion chunk par chunk — évite le stack overflow sur gros fichiers
+      const base64 = arrayBufferToBase64(arrayBuffer);
+      setLoadingStep('Analyse par l\'IA…');
       await analyzeReport(base64, f.name);
     } catch (err) {
       setError('Erreur lecture PDF : ' + err.message);
@@ -48,20 +58,16 @@ export default function Report() {
     }
   };
 
-  const analyzeReport = async (base64OrText, filename) => {
-    setLoadingStep('Extraction du texte…');
+  const analyzeReport = async (base64, filename) => {
     try {
-      // On envoie le base64 à une route qui extrait le texte puis l'analyse
       const res = await fetch('/api/analyze-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdf_base64: base64OrText, filename }),
+        body: JSON.stringify({ pdf_base64: base64, filename }),
       });
-      setLoadingStep('Analyse par l\'IA…');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setResult(data);
-      // Sauvegarder pour le dashboard
       localStorage.setItem('diabia_last_report', JSON.stringify(data));
     } catch (err) {
       setError(err.message);
@@ -122,14 +128,16 @@ export default function Report() {
         {error && (
           <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: 14 }}>
             <p style={{ color: '#f87171', fontSize: 14, marginBottom: 8 }}>{error}</p>
-            <button onClick={() => { setError(null); setFile(null); }} style={{ background: 'none', border: '1px solid #374151', borderRadius: 8, color: '#94a3b8', fontSize: 13, padding: '7px 14px', cursor: 'pointer' }}>Réessayer</button>
+            <button onClick={() => { setError(null); setFile(null); }} style={{ background: 'none', border: '1px solid #374151', borderRadius: 8, color: '#94a3b8', fontSize: 13, padding: '7px 14px', cursor: 'pointer' }}>
+              Réessayer
+            </button>
           </div>
         )}
 
         {/* Résultats */}
         {result && (
           <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Header résultat */}
+            {/* Header */}
             <div style={{ background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 16, padding: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                 <div>
@@ -137,9 +145,9 @@ export default function Report() {
                   <p style={{ color: '#f1f5f9', fontSize: 16, fontWeight: 700 }}>{result.period}</p>
                 </div>
                 <span style={{
-                  background: `${STATUS_COLOR[result.status]}15`,
-                  color: STATUS_COLOR[result.status],
-                  border: `1px solid ${STATUS_COLOR[result.status]}30`,
+                  background: `${STATUS_COLOR[result.status] || '#94a3b8'}15`,
+                  color: STATUS_COLOR[result.status] || '#94a3b8',
+                  border: `1px solid ${STATUS_COLOR[result.status] || '#94a3b8'}30`,
                   borderRadius: 20, padding: '5px 12px', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
                 }}>
                   {result.status}
@@ -199,13 +207,13 @@ export default function Report() {
                   <div key={i} style={{ background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 14, padding: '14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ color: '#64748b', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{rec.category}</span>
-                      <span style={{ background: `${PRIORITY_COLOR[rec.priority]}15`, color: PRIORITY_COLOR[rec.priority], fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>
+                      <span style={{ background: `${PRIORITY_COLOR[rec.priority] || '#94a3b8'}15`, color: PRIORITY_COLOR[rec.priority] || '#94a3b8', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>
                         {rec.priority}
                       </span>
                     </div>
                     <p style={{ color: '#e2e8f0', fontSize: 14, lineHeight: 1.6, marginBottom: rec.current_value || rec.suggested_value ? 10 : 0 }}>{rec.explanation}</p>
                     {(rec.current_value || rec.suggested_value) && (
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {rec.current_value && <span style={{ background: '#1a1f2e', color: '#6b7280', fontSize: 12, padding: '4px 10px', borderRadius: 8 }}>Actuel : {rec.current_value}</span>}
                         {rec.suggested_value && <span style={{ background: 'rgba(59,130,246,0.12)', color: '#60a5fa', fontSize: 12, padding: '4px 10px', borderRadius: 8 }}>Suggéré : {rec.suggested_value}</span>}
                       </div>
