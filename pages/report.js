@@ -26,6 +26,18 @@ export default function Report() {
   const [pdfjsLib, setPdfjsLib] = useState(null);
   const fileRef = useRef();
 
+  // Charger le rapport persistant au montage
+  useEffect(() => {
+    const savedReport = localStorage.getItem('diabia_last_report');
+    if (savedReport) {
+      try {
+        setResult(JSON.parse(savedReport));
+      } catch (e) {
+        console.error('Erreur chargement rapport persistant:', e);
+      }
+    }
+  }, []);
+
   // Charger pdfjs-dist dynamiquement côté client
   useEffect(() => {
     const loadPdfJs = async () => {
@@ -121,6 +133,14 @@ export default function Report() {
     }
   };
 
+  const clearPersistedReport = () => {
+    localStorage.removeItem('diabia_last_report');
+    setResult(null);
+    setFile(null);
+  };
+
+  const showPersistenceInfo = result && !file;
+
   const TABS = [
     { key: 'summary', label: 'Resume' },
     { key: 'recommendations', label: 'Conseils' },
@@ -181,6 +201,13 @@ export default function Report() {
         {/* Resultats */}
         {result && (
           <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Indicateur de persistance */}
+            {showPersistenceInfo && (
+              <div style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.2)', borderRadius: 12, padding: '10px 14px', marginBottom: 12 }}>
+                <p style={{ color: '#4ade80', fontSize: 12, fontWeight: 600 }}>Donnees persistantes - Dernier rapport charge</p>
+              </div>
+            )}
+
             {/* Header */}
             <div style={{ background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 16, padding: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -316,9 +343,14 @@ export default function Report() {
               </div>
             )}
 
-            <button onClick={() => { setResult(null); setFile(null); }} style={{ background: '#0f1117', border: '1px solid #1a1f2e', color: '#64748b', borderRadius: 12, padding: '13px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-              Analyser un nouveau rapport
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { setResult(null); setFile(null); }} style={{ flex: 1, background: '#0f1117', border: '1px solid #1a1f2e', color: '#64748b', borderRadius: 12, padding: '13px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+                Analyser un nouveau rapport
+              </button>
+              <button onClick={clearPersistedReport} style={{ background: '#0f1117', border: '1px solid #1a1f2e', color: '#ef4444', borderRadius: 12, padding: '13px', fontSize: 14, fontWeight: 500, cursor: 'pointer', minWidth: 100 }}>
+                Effacer
+              </button>
+            </div>
           </div>
         )}
       </div>

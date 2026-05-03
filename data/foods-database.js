@@ -3,18 +3,18 @@
 // https://ciqual.anses.fr/
 
 export const FOOD_CATEGORIES = [
-  { id: 'fruits', label: 'Fruits', icon: '🍎' },
-  { id: 'legumes', label: 'Légumes', icon: '🥕' },
-  { id: 'feculents', label: 'Féculents', icon: '🍞' },
-  { id: 'cereales', label: 'Céréales & Petit-déj', icon: '🥣' },
-  { id: 'produits-laitiers', label: 'Produits laitiers', icon: '🥛' },
-  { id: 'viandes', label: 'Viandes & Poissons', icon: '🍖' },
-  { id: 'boissons', label: 'Boissons', icon: '🥤' },
-  { id: 'sucres', label: 'Sucres & Desserts', icon: '🍰' },
-  { id: 'sauces', label: 'Sauces & Condiments', icon: '🍯' },
-  { id: 'plats', label: 'Plats préparés', icon: '🍝' },
-  { id: 'fast-food', label: 'Fast-food', icon: '🍔' },
-  { id: 'snacks', label: 'Snacks & Apéritifs', icon: '🍿' },
+  { id: 'fruits', name: 'Fruits', emoji: '🍎' },
+  { id: 'legumes', name: 'Légumes', emoji: '🥕' },
+  { id: 'feculents', name: 'Féculents', emoji: '🍞' },
+  { id: 'cereales', name: 'Céréales & Petit-déj', emoji: '🥣' },
+  { id: 'produits-laitiers', name: 'Produits laitiers', emoji: '🥛' },
+  { id: 'viandes', name: 'Viandes & Poissons', emoji: '🍖' },
+  { id: 'boissons', name: 'Boissons', emoji: '🥤' },
+  { id: 'sucres', name: 'Sucres & Desserts', emoji: '🍰' },
+  { id: 'sauces', name: 'Sauces & Condiments', emoji: '🍯' },
+  { id: 'plats', name: 'Plats préparés', emoji: '🍝' },
+  { id: 'fast-food', name: 'Fast-food', emoji: '🍔' },
+  { id: 'snacks', name: 'Snacks & Apéritifs', emoji: '🍿' },
 ];
 
 // Valeurs pour 100g — carbs = glucides totaux, fiber = fibres, gi = index glycémique
