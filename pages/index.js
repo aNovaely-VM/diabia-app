@@ -450,7 +450,7 @@ export default function Dashboard() {
         {/* Footer */}
         <footer className="footer-mention">
           <p>réalisé avec &lt;3, par <strong>ARDEVOL-CARRAT Matthias</strong></p>
-          <div className="version-badge">v1.2.6</div>
+          <div className="version-badge">v1.3.1</div>
         </footer>
 
       </div>
