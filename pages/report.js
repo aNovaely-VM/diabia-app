@@ -241,7 +241,15 @@ export default function Report() {
       });
       if (!res.ok) {
         const t = await res.text();
-        throw new Error(JSON.parse(t)?.error || `Erreur serveur (${res.status})`);
+        try {
+          // On essaie de lire le JSON si l'API a bien renvoyé une erreur formatée
+          const parsed = JSON.parse(t);
+          throw new Error(parsed.error || `Erreur serveur (${res.status})`);
+        } catch (parseError) {
+          // Si ça plante ici, c'est que Vercel a renvoyé du HTML (souvent une page 404 ou 504)
+          console.error("Réponse brute du serveur:", t);
+          throw new Error(`Erreur serveur (${res.status}) : Impossible d'atteindre l'API. Vérifie que /api/analyze-report existe.`);
+        }
       }
       const data = await res.json();
       if (data.error) throw new Error(data.error);
