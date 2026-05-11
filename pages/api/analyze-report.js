@@ -2,20 +2,24 @@
 // Parser 100% local — extraction exhaustive du rapport CareLink (MiniMed 780G)
 // Inclut : stats, réglages pompe, bolus, repas, événements, données journalières, comparaison périodes
 
-export async function POST(request) {
-  const body = await request.json();
-  const { pdf_text } = body;
-  
+export default async function handler(req, res) {
+  // On vérifie que c'est bien du POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Méthode non autorisée' });
+  }
+
+  const { pdf_text } = req.body; // Dans Pages, le body est déjà parsé
+
   if (!pdf_text || pdf_text.trim().length < 50) {
-    return Response.json({ error: 'Texte PDF manquant.' }, { status: 400 });
+    return res.status(400).json({ error: 'Texte PDF manquant.' });
   }
 
   try {
     const result = parseCareLink(pdf_text);
-    return Response.json(result);
+    return res.status(200).json(result);
   } catch (e) {
     console.error('[diabia/parse]', e);
-    return Response.json({ error: 'Erreur parsing : ' + e.message }, { status: 500 });
+    return res.status(500).json({ error: 'Erreur parsing : ' + e.message });
   }
 }
 
