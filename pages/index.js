@@ -1,4 +1,3 @@
-// DIABIA — Dashboard professionnel sans emojis
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import Link from 'next/link';
@@ -224,11 +223,11 @@ export default function Dashboard() {
           )}
 
           {/* Input nouvelle glycémie */}
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{
-              flex: 1, display: 'flex', alignItems: 'center', gap: 12,
+          <div className="glycemia-save-row">
+            <div className="glycemia-input-shell" style={{
+              flex: 1, display: 'flex', alignItems: 'center', gap: 10,
               background: '#1a1f2e', border: '1px solid #2d3748', borderRadius: 14,
-              padding: '4px 16px',
+              padding: '4px 12px',
             }}>
               <input
                 type="number"
@@ -239,21 +238,20 @@ export default function Dashboard() {
                 onKeyDown={(e) => e.key === 'Enter' && saveGlycemia()}
                 style={{
                   flex: 1, background: 'transparent', border: 'none',
-                  color: '#e2e8f0', fontSize: 18, fontWeight: 700,
-                  padding: '12px 0', outline: 'none',
+                  color: '#e2e8f0', fontSize: 16, fontWeight: 700,
+                  padding: '12px 0', outline: 'none', minWidth: 0,
                 }}
               />
               <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>mg/dL</span>
             </div>
             <button
               onClick={saveGlycemia}
-              className="btn-primary"
+              className="btn-primary glycemia-save-button"
               style={{
                 background: saved ? '#22c55e' : undefined,
-                padding: '0 24px',
               }}
             >
-              {saved ? 'OK' : 'Sauver'}
+              {saved ? 'OK' : 'Sauvegarder'}
             </button>
           </div>
 
@@ -295,8 +293,11 @@ export default function Dashboard() {
               Ratios Insuline/Glucides
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {Object.entries(ratios).map(([slotId, slot]) => (
-                <div key={slotId} style={{ background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 12, padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {['breakfast', 'lunch', 'snack', 'dinner', 'night'].map((slotId) => {
+                const slot = ratios[slotId];
+                if (!slot) return null;
+                return (
+                  <div key={slotId} style={{ background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 12, padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <p style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 600 }}>{slot.name}</p>
                     <p style={{ color: '#64748b', fontSize: 12 }}>{slot.startTime} - {slot.endTime}</p>
@@ -317,8 +318,9 @@ export default function Dashboard() {
                       {editingRatio === slotId ? 'Fermer' : 'Modifier'}
                     </button>
                   </div>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Édition du ratio */}
@@ -448,7 +450,7 @@ export default function Dashboard() {
         {/* Footer */}
         <footer className="footer-mention">
           <p>réalisé avec &lt;3, par <strong>ARDEVOL-CARRAT Matthias</strong></p>
-          <div className="version-badge">v1.2.5</div>
+          <div className="version-badge">v1.2.6</div>
         </footer>
 
       </div>
